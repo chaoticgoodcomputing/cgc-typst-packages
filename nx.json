@@ -15,7 +15,6 @@
     },
     "version": {
       "conventionalCommits": true,
-      "currentVersionResolver": "git-tag",
       "fallbackCurrentVersionResolver": "disk",
       "versionActions": "./tools/typst-version-actions.js",
       "versionPrefix": ""
