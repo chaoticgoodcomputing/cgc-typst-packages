@@ -148,7 +148,8 @@ vite.config.ts.timestamp-*
 __MACOSX/
 .AppleDouble
 .LSOverride
-Icon[]
+Icon[
+]
 
 # Thumbnails
 ._*
@@ -210,3 +211,5 @@ $RECYCLE.BIN/
 
 # Log files created by default by the nohup command
 nohup.out
+
+.nx

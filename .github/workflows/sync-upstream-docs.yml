@@ -1,0 +1,34 @@
+name: Sync Upstream Typst Packages Docs
+
+# Keeps docs/typst-packages/ in sync with the LICENSE and docs/ directory of
+# typst/packages.  When upstream guidelines or schemas change, the diff surfaces
+# as a PR here rather than drifting silently out of date.
+#
+# Review the PR diff for:
+#   - Submission-guideline changes that require publish.yml or typst.toml updates
+#   - New required manifest fields or naming rules
+#   - New tooling recommendations in tips.md / resources.md
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Weekly, Monday 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Sync upstream typst/packages docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history needed so git hash-object comparisons are accurate
+          fetch-depth: 0
+
+      - name: Check for changes and open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/sync_docs.py

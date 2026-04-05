@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "cgc-resume-starter",
+  "//": "Typst resume starter template, published to Typst Universe via the publish workflow",
+  "root": "packages/cgc-resume-starter",
+  "sourceRoot": "packages/cgc-resume-starter",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "//": "Validate package structure and manifest against Typst Universe submission requirements",
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [ "typst-package-check packages/cgc-resume-starter" ],
+        "parallel": false
+      }
+    }
+  },
+  "tags": [ ]
+}

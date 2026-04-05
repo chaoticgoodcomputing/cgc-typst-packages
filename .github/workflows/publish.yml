@@ -1,0 +1,240 @@
+name: Publish to Typst Universe
+
+# Triggered automatically by release tags (e.g. cgc-resume-starter@2.1.0).
+# Can also be run manually; defaults to dry_run=true so the fork branch
+# is prepared and validated without opening the upstream PR.
+
+on:
+  push:
+    tags:
+      - "*@*"
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: "Package name (e.g. cgc-resume-starter)"
+        required: true
+        type: string
+      version:
+        description: "Version (e.g. 2.0.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Prepare fork branch but skip PR creation"
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    name: >-
+      Publish ${{
+        github.event_name == 'workflow_dispatch'
+        && format('{0}@{1}', inputs.package_name, inputs.version)
+        || github.ref_name
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. Resolve parameters from tag or manual inputs ──────────────────
+      - name: Determine release parameters
+        id: params
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            PACKAGE_NAME="${{ inputs.package_name }}"
+            VERSION="${{ inputs.version }}"
+            DRY_RUN="${{ inputs.dry_run }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            PACKAGE_NAME="${TAG%@*}"
+            VERSION="${TAG#*@}"
+            DRY_RUN="false"
+          fi
+          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
+          echo "dry_run=$DRY_RUN"           >> "$GITHUB_OUTPUT"
+          echo "Release: $PACKAGE_NAME@$VERSION  (dry_run=$DRY_RUN)"
+
+      # ── 2. Validate package structure and version consistency ─────────────
+      - name: Validate package
+        run: |
+          PACKAGE_DIR="packages/${{ steps.params.outputs.package_name }}"
+          VERSION="${{ steps.params.outputs.version }}"
+
+          if [[ ! -d "$PACKAGE_DIR" ]]; then
+            echo "::error::Package directory not found: $PACKAGE_DIR"
+            exit 1
+          fi
+
+          if [[ ! -f "$PACKAGE_DIR/typst.toml" ]]; then
+            echo "::error::typst.toml not found in $PACKAGE_DIR"
+            exit 1
+          fi
+
+          TOML_VERSION=$(python3 -c "
+          import tomllib, sys
+          with open('$PACKAGE_DIR/typst.toml', 'rb') as f:
+              print(tomllib.load(f)['package']['version'])
+          ")
+
+          if [[ "$TOML_VERSION" != "$VERSION" ]]; then
+            echo "::error::Version mismatch: tag says $VERSION but typst.toml says $TOML_VERSION"
+            exit 1
+          fi
+
+          if [[ ! -f "$PACKAGE_DIR/README.md" ]]; then
+            echo "::error::README.md missing from $PACKAGE_DIR"
+            exit 1
+          fi
+
+          if [[ ! -f "$PACKAGE_DIR/LICENSE" && ! -f "$PACKAGE_DIR/LICENSE.md" ]]; then
+            echo "::error::LICENSE or LICENSE.md missing from $PACKAGE_DIR"
+            exit 1
+          fi
+
+          echo "Validation passed: ${{ steps.params.outputs.package_name }}@$VERSION"
+
+      # ── 3. Guard against re-releasing an already-published version ────────
+      - name: Check for existing upstream version
+        env:
+          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
+        run: |
+          PACKAGE_NAME="${{ steps.params.outputs.package_name }}"
+          VERSION="${{ steps.params.outputs.version }}"
+          UPSTREAM_PATH="packages/preview/$PACKAGE_NAME/$VERSION"
+
+          STATUS=$(gh api "repos/typst/packages/contents/$UPSTREAM_PATH" \
+            --jq '.type' 2>/dev/null || echo "not_found")
+
+          if [[ "$STATUS" != "not_found" ]]; then
+            echo "::error::$UPSTREAM_PATH already exists in typst/packages. Cannot re-release."
+            exit 1
+          fi
+          echo "No existing upstream entry for $PACKAGE_NAME@$VERSION ✓"
+
+      # ── 4. Lint the package via typst-package-check ───────────────────────
+      - name: Cache Cargo bin
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-typst-package-check
+
+      - name: Install typst-package-check
+        run: |
+          if ! command -v typst-package-check &>/dev/null; then
+            cargo install typst-package-check --locked
+          fi
+
+      - name: Lint
+        run: typst-package-check packages/${{ steps.params.outputs.package_name }}
+
+      # ── 5. Sync fork to upstream HEAD ─────────────────────────────────────
+      - name: Sync fork to upstream
+        env:
+          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
+        run: |
+          RESULT=$(gh api repos/chaoticgoodcomputing/typst-packages-shim/merge-upstream \
+            -X POST -f branch=main --jq '.merge_type')
+          echo "Fork sync result: $RESULT"
+
+          if [[ "$RESULT" == "diverged" ]]; then
+            echo "::warning::Fork diverged from upstream — hard-resetting main to upstream HEAD"
+            UPSTREAM_SHA=$(gh api repos/typst/packages/git/ref/heads/main --jq '.object.sha')
+            gh api repos/chaoticgoodcomputing/typst-packages-shim/git/refs/heads/main \
+              -X PATCH -f sha="$UPSTREAM_SHA" -f force=true
+            echo "::warning::Fork reset to $UPSTREAM_SHA"
+          fi
+
+      # ── 6. Create branch on fork ──────────────────────────────────────────
+      - name: Get fork HEAD SHA
+        id: fork_head
+        env:
+          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
+        run: |
+          SHA=$(gh api repos/chaoticgoodcomputing/typst-packages-shim/git/ref/heads/main \
+            --jq '.object.sha')
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Create branch on fork
+        id: branch
+        env:
+          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
+        run: |
+          PACKAGE_NAME="${{ steps.params.outputs.package_name }}"
+          VERSION="${{ steps.params.outputs.version }}"
+          BRANCH="add/$PACKAGE_NAME-$VERSION"
+
+          EXISTING=$(gh api "repos/chaoticgoodcomputing/typst-packages-shim/git/ref/heads/$BRANCH" \
+            --jq '.ref' 2>/dev/null || echo "")
+
+          if [[ -n "$EXISTING" ]]; then
+            echo "Branch $BRANCH already exists — deleting for clean re-run"
+            gh api "repos/chaoticgoodcomputing/typst-packages-shim/git/refs/heads/$BRANCH" -X DELETE
+          fi
+
+          gh api repos/chaoticgoodcomputing/typst-packages-shim/git/refs \
+            -X POST \
+            -f ref="refs/heads/$BRANCH" \
+            -f sha="${{ steps.fork_head.outputs.sha }}"
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Created branch: $BRANCH"
+
+      # ── 7. Assemble and push package tree to fork ─────────────────────────
+      - name: Assemble package tree on fork
+        env:
+          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
+        run: |
+          python3 .github/scripts/push_package_tree.py \
+            --package-name "${{ steps.params.outputs.package_name }}" \
+            --version      "${{ steps.params.outputs.version }}" \
+            --branch       "${{ steps.branch.outputs.branch }}" \
+            --fork         "chaoticgoodcomputing/typst-packages-shim"
+
+      # ── 8. Open PR on typst/packages (skipped when dry_run=true) ─────────
+      - name: Check for existing PR
+        id: pr_check
+        if: steps.params.outputs.dry_run == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
+        run: |
+          BRANCH="${{ steps.branch.outputs.branch }}"
+          EXISTING=$(gh api \
+            "repos/typst/packages/pulls?head=chaoticgoodcomputing:$BRANCH&state=open" \
+            --jq '.[0].html_url' 2>/dev/null || echo "")
+          echo "existing_url=$EXISTING" >> "$GITHUB_OUTPUT"
+
+      - name: Build PR payload
+        if: steps.params.outputs.dry_run == 'false' && steps.pr_check.outputs.existing_url == ''
+        env:
+          PACKAGE_NAME: ${{ steps.params.outputs.package_name }}
+          VERSION: ${{ steps.params.outputs.version }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: python3 .github/scripts/build_pr_payload.py
+
+      - name: Open PR on typst/packages
+        if: steps.params.outputs.dry_run == 'false' && steps.pr_check.outputs.existing_url == ''
+        env:
+          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
+        run: |
+          PR_URL=$(gh api repos/typst/packages/pulls \
+            -X POST --input /tmp/pr_payload.json --jq '.html_url')
+          echo "::notice::PR opened: $PR_URL"
+          echo "## PR Opened" >> "$GITHUB_STEP_SUMMARY"
+          echo "$PR_URL"      >> "$GITHUB_STEP_SUMMARY"
+
+      - name: PR already open (skipping)
+        if: steps.params.outputs.dry_run == 'false' && steps.pr_check.outputs.existing_url != ''
+        run: echo "::notice::PR already exists — ${{ steps.pr_check.outputs.existing_url }}"
+
+      - name: Dry run summary
+        if: steps.params.outputs.dry_run == 'true'
+        run: |
+          echo "## Dry Run Complete"                                             >> "$GITHUB_STEP_SUMMARY"
+          echo ""                                                                >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch \`${{ steps.branch.outputs.branch }}\` has been pushed"  >> "$GITHUB_STEP_SUMMARY"
+          echo "to \`chaoticgoodcomputing/typst-packages-shim\`"               >> "$GITHUB_STEP_SUMMARY"
+          echo ""                                                                >> "$GITHUB_STEP_SUMMARY"
+          echo "Review the branch, then re-run with **dry run** unchecked."     >> "$GITHUB_STEP_SUMMARY"
