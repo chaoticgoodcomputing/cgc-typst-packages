@@ -11,7 +11,7 @@
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "VERSION=$(grep '^version' docs/reference/external/typst-package-check/repo/Cargo.toml | head -1 | cut -d'\"' -f2) && docker run --rm -v \"$PWD/packages/cgc-resume-starter:/data\" \"ghcr.io/typst/package-check:$VERSION\" check"
+          "VERSION=$(node -p \"require('./.github/tool-versions.json')['typst-package-check']\") && docker run --rm -v \"$PWD/packages/cgc-resume-starter:/data\" \"ghcr.io/typst/package-check:$VERSION\" check"
         ],
         "parallel": false
       } },

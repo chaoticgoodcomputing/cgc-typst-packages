@@ -119,8 +119,7 @@ process.stdout.write(m[1]);
       - name: Resolve typst-package-check version
         id: tpc
         run: |
-          VERSION=$(grep '^version' docs/reference/external/typst-package-check/repo/Cargo.toml \
-            | head -1 | cut -d'"' -f2)
+          VERSION=$(node -p "require('./.github/tool-versions.json')['typst-package-check']")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Lint
