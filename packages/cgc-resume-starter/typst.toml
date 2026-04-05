@@ -6,7 +6,7 @@ authors = ["Spencer Elkington <https://chaoticgood.computer>"]
 license = "Unlicense"
 description = "A guided starter resume for people looking to focus on highlighting their experience -- without having to worry about the hassle of formatting."
 homepage = "https://blog.chaoticgood.computer/writing/notes/typst-resume-template"
-repository = "https://github.com/chaoticgoodcomputing/typst"
+repository = "https://github.com/chaoticgoodcomputing/cgc-typst-packages"
 categories = ["cv"]
 keywords = [
   "resume",

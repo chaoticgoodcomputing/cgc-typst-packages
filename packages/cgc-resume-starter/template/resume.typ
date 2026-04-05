@@ -1,4 +1,4 @@
-#import "@preview/guided-resume-starter-cgc:2.0.0": *
+#import "@preview/cgc-resume-starter:2.0.0": *
 
 #show: resume.with(
   author: "Dr. Emmit \"Doc\" Brown",
@@ -29,37 +29,46 @@
   degrees: (
     ("Bachelor's of Science", "Nuclear Engineering"),
     ("Minors", "Automobile Design, Arabic"),
-    ("Focus", "Childcare, Education")
+    ("Focus", "Childcare, Education"),
   ),
 )
 
 = Skills
 #skills((
-  ("Expertise", (
-    [Theoretical Physics],
-    [Time Travel],
-    [Nuclear Material Management],
-    [Student Mentoring],
-    // [Ethics],
-    // [Hair Cair],
-    // [Jumpsuit Design],
-    // [Conflict Resolution],
-  )),
-  ("Software", (
-    [AutoDesk CAD],
-    [Delorean OS],
-    [Windows 1],
-    // [Microsoft Word],
-    // [Car Maintenance],
-  )),
-  ("Languages", (
-    [C++],
-    [C Language],
-    [MatLab],
-    [Punch Cards],
-    // [Python],
-    // [C\#]
-  )),
+  (
+    "Expertise",
+    (
+      [Theoretical Physics],
+      [Time Travel],
+      [Nuclear Material Management],
+      [Student Mentoring],
+      // [Ethics],
+      // [Hair Cair],
+      // [Jumpsuit Design],
+      // [Conflict Resolution],
+    ),
+  ),
+  (
+    "Software",
+    (
+      [AutoDesk CAD],
+      [Delorean OS],
+      [Windows 1],
+      // [Microsoft Word],
+      // [Car Maintenance],
+    ),
+  ),
+  (
+    "Languages",
+    (
+      [C++],
+      [C Language],
+      [MatLab],
+      [Punch Cards],
+      // [Python],
+      // [C\#]
+    ),
+  ),
 ))
 
 
@@ -74,7 +83,7 @@
     - Lead development of time travel devices, resulting in the ability to travel back and forth through time
     - Managed and executed a budget of \$14 million dollars gained from an unexplained family fortune
     - Oversaw QA testing for time travel devices, minimizing risk of maternal time-travel related incidents
-  ]
+  ],
 )
 
 #exp(
@@ -86,7 +95,7 @@
     - Assisted in designing physics course structure and assignments in English, Spanish and German
     - Designed confidential rocket designs used in NASA Space Race initiatives and the Apollo Program
     - Developed and executed university DEI initiatives and onboarding programs for transfer professors
-  ]
+  ],
 )
 
 
@@ -100,7 +109,7 @@
     - Designed vehicle modifications allowing for time travel and *37% increased cup holder capacity*
     - Ethically sourced materials from various international Colombian and Libyan providers
     - Coordinated business relationships with potential clients and interested parties
-  ]
+  ],
 )
 
 #exp(
@@ -110,7 +119,7 @@
   details: [
     - Filed a patent for a new type of car cupholder, for storing cups of nuclear material up to 1L
     - Developed nuclear hazard procedures for high school students interested in time and nuclear physics
-  ]
+  ],
 )
 
 
@@ -123,5 +132,5 @@
   details: [
     - Created community initiative to teach local student(s) about the wonders of nuclear physics
     - Provided interesting time travel research opportunities for students to add to their college applications
-  ]
+  ],
 )

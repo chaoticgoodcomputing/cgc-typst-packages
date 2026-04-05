@@ -58,7 +58,7 @@ If this is your first resume, I'd recommend sticking with this formatting for no
 
 */
 
-#import "@preview/guided-resume-starter-cgc:2.0.0": *
+#import "@preview/cgc-resume-starter:2.0.0": *
 
 #show: resume.with(
   author: "Dr. Emmit \"Doc\" Brown",
@@ -133,7 +133,7 @@ On the other hand, there is a risk that somebody out there is still printing sta
   degrees: (
     ("Bachelor's of Science", "Nuclear Engineering"),
     ("Minors", "Automobile Design, Arabic"),
-    ("Focus", "Childcare, Education")
+    ("Focus", "Childcare, Education"),
   ),
 )
 
@@ -194,31 +194,40 @@ Prior to graduating, I opted to go with option 2 and never ran into issues. In g
 
 = Skills
 #skills((
-  ("Expertise", (
-    [Theoretical Physics],
-    [Time Travel],
-    [Nuclear Material Management],
-    [Student Mentoring],
-    // [Ethics],
-    // [Hair Cair],
-    // [Jumpsuit Design],
-    // [Conflict Resolution],
-  )),
-  ("Software", (
-    [AutoDesk CAD],
-    [Delorean OS],
-    [Windows 1],
-    // [Microsoft Word],
-    // [Car Maintenance],
-  )),
-  ("Languages", (
-    [C++],
-    [C Language],
-    [MatLab],
-    [Punch Cards],
-    // [Python],
-    // [C\#]
-  )),
+  (
+    "Expertise",
+    (
+      [Theoretical Physics],
+      [Time Travel],
+      [Nuclear Material Management],
+      [Student Mentoring],
+      // [Ethics],
+      // [Hair Cair],
+      // [Jumpsuit Design],
+      // [Conflict Resolution],
+    ),
+  ),
+  (
+    "Software",
+    (
+      [AutoDesk CAD],
+      [Delorean OS],
+      [Windows 1],
+      // [Microsoft Word],
+      // [Car Maintenance],
+    ),
+  ),
+  (
+    "Languages",
+    (
+      [C++],
+      [C Language],
+      [MatLab],
+      [Punch Cards],
+      // [Python],
+      // [C\#]
+    ),
+  ),
 ))
 
 /*
@@ -311,7 +320,7 @@ or
 
 > Languages: English (fluent), Spanish (fluent), Arabic (conversational)...
 
-I would highly recommend this for natural languages. I would somewhat, possibly — *maybe* — recommend it for programming languages. If you do it for one language, though, you should really do it for all languages. Only doing it for one or two languages — but none of the others — may seem to imply you don't know the other languages as well and are listing it as a form of cheap talk. 
+I would highly recommend this for natural languages. I would somewhat, possibly — *maybe* — recommend it for programming languages. If you do it for one language, though, you should really do it for all languages. Only doing it for one or two languages — but none of the others — may seem to imply you don't know the other languages as well and are listing it as a form of cheap talk.
 
 If you want to emphasize particular skill with a programming language, you can also:
 
@@ -345,7 +354,7 @@ The exception to this rule is that you should have a dedicated skills section if
     - Lead development of time travel devices, resulting in the ability to travel back and forth through time
     - Managed and executed a budget of \$14 million dollars gained from an unexplained family fortune
     - Oversaw QA testing for time travel devices, minimizing risk of maternal time-travel related incidents
-  ]
+  ],
 )
 
 #exp(
@@ -357,7 +366,7 @@ The exception to this rule is that you should have a dedicated skills section if
     - Assisted in designing physics course structure and assignments in English, Spanish and German
     - Designed confidential rocket designs used in NASA Space Race initiatives and the Apollo Program
     - Developed and executed university DEI initiatives and onboarding programs for transfer professors
-  ]
+  ],
 )
 
 /*
@@ -452,7 +461,7 @@ Before I worked there, there was an occasion where the team had to reconstruct a
 > 3 engineers * 40 hours * 12 weeks = 1440 hours
 > 1440 hours previously - 3 hours now,
 > 1437 saved / 1440 hours originally =
-> 
+>
 > a 99.7% time optimization.
 
 HOWEVER — I hadn't done that math until literally just now, as I was typing it. When I wrote the bullet point for that entry on my own resume, I vaguely went "3 hours now versus 3 months before? That's probably more than 90% ¯\_(ツ)_/¯"
@@ -478,7 +487,7 @@ If you're looking for measurable results at your current position, you have the 
 When you're writing bullet points, you should try to keep them to a whole-integer number of lines used. Here's a less-weirdly-phrased example to illustrate what I mean:
 
 ```typ
-- Lead development of time travel devices, resulting in the <LINE BREAK> 
+- Lead development of time travel devices, resulting in the <LINE BREAK>
   ability to travel back and forth through time ........................
 ```
 
@@ -540,7 +549,7 @@ When trimming experience, one thing you want to avoid is gaps on your resume. Th
 
 While I (as a reviewer) tend to ignore gaps because there's a billion totally valid reasons those can happen (Maybe they were a full-time student, or taking care of a loved one, or got laid off and worked in an unrelated field to make ends meet, or took care of a child or parent, or they stumbled on a bag of money and fucked off to bike Europe for a year, etc.). However, sometimes significant resume gaps freak people out.
 
-If you're in the process of removing non-relevant experience from your resume and find yourself with a noticeable gap (>4 months), I'd recommend adding a summarized-but-not-detailed entry for the gap period. 
+If you're in the process of removing non-relevant experience from your resume and find yourself with a noticeable gap (>4 months), I'd recommend adding a summarized-but-not-detailed entry for the gap period.
 
 For example:
 
@@ -581,7 +590,7 @@ In general, the hyperlinks I tend to include are:
     - Designed vehicle modifications allowing for time travel and *37% increased cup holder capacity*
     - Ethically sourced materials from various international Colombian and Libyan providers
     - Coordinated business relationships with potential clients and interested parties
-  ]
+  ],
 )
 
 #exp(
@@ -591,7 +600,7 @@ In general, the hyperlinks I tend to include are:
   details: [
     - Filed a patent for a new type of car cupholder, for storing cups of nuclear material up to 1L
     - Developed nuclear hazard procedures for high school students interested in time and nuclear physics
-  ]
+  ],
 )
 
 
@@ -604,7 +613,7 @@ In general, the hyperlinks I tend to include are:
   details: [
     - Created community initiative to teach local student(s) about the wonders of nuclear physics
     - Provided interesting time travel research opportunities for students to add to their college applications
-  ]
+  ],
 )
 
 /*
@@ -621,7 +630,7 @@ In general, the only hard-advised sections of a resume that I've seen consistent
 - Leadership
 - Awards (which, depending on your preferences, could reasonably use a different entry format)
 
-A flavor of section that I see a lot - and would NOT recommend - is something along the lines of "Hobbies" or "Interests". This is occasionally recommended to give "flavor" to your resume or "humanize" you in some way. 
+A flavor of section that I see a lot - and would NOT recommend - is something along the lines of "Hobbies" or "Interests". This is occasionally recommended to give "flavor" to your resume or "humanize" you in some way.
 
 (I understand that putting quotes around "flavor" and "humanize" make me sound like a boring robot of a person, but bear with me, here.)
 
