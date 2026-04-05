@@ -116,20 +116,18 @@ process.stdout.write(m[1]);
           echo "Validation passed: ${{ matrix.package_name }}@$VERSION"
 
       # ── 2. Lint via typst-package-check ───────────────────────────────────
-      - name: Cache Cargo bin
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin
-          key: ${{ runner.os }}-cargo-bin-typst-package-check
-
-      - name: Install typst-package-check
+      - name: Resolve typst-package-check version
+        id: tpc
         run: |
-          if ! command -v typst-package-check &>/dev/null; then
-            cargo install typst-package-check --locked
-          fi
+          VERSION=$(grep '^version' docs/reference/external/typst-package-check/repo/Cargo.toml \
+            | head -1 | cut -d'"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Lint
-        run: typst-package-check packages/${{ matrix.package_name }}
+        run: >
+          docker run --rm
+          -v "$PWD/packages/${{ matrix.package_name }}:/data"
+          ghcr.io/typst/package-check:${{ steps.tpc.outputs.version }} check
 
       # ── 3. Sync shim fork to upstream HEAD ────────────────────────────────
       - name: Sync shim fork to upstream

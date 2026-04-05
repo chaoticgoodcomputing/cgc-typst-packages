@@ -10,7 +10,9 @@
       "//": "Validate package structure and manifest against Typst Universe submission requirements",
       "executor": "nx:run-commands",
       "options": {
-        "commands": [ "typst-package-check packages/cgc-resume-starter" ],
+        "commands": [
+          "VERSION=$(grep '^version' docs/reference/external/typst-package-check/repo/Cargo.toml | head -1 | cut -d'\"' -f2) && docker run --rm -v \"$PWD/packages/cgc-resume-starter:/data\" \"ghcr.io/typst/package-check:$VERSION\" check"
+        ],
         "parallel": false
       } },
     "test": {
