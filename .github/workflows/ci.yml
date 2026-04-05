@@ -31,3 +31,53 @@ jobs:
 
       - name: Test
         run: pnpm nx run-many --target=test --projects='packages/*'
+
+  release:
+    name: Release
+    # Only run on pushes to main (not on PRs), and only if CI passed.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Checkout HEAD of main so nx release sees the full commit history.
+          # persist-credentials keeps GITHUB_TOKEN wired to the git remote.
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --tags --prune
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure git identity
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      # --skip-publish skips the registry publish prompt without implying we
+      # want to publish. git.commit and git.tag are configured in nx.json;
+      # git.push is false so we push explicitly below with --follow-tags.
+      - name: Run nx release
+        run: pnpm nx release --skip-publish
+
+      - name: Push release commits and tags
+        run: |
+          if git log --oneline origin/main..HEAD | grep -q .; then
+            git push --follow-tags origin main
+            echo "::notice::Release committed and pushed to main."
+          else
+            echo "No releasable changes found — nothing to push."
+          fi
