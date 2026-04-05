@@ -3,10 +3,19 @@
   "defaultBase": "main",
   "release": {
     "projects": [ "packages/*" ],
+    "projectsRelationship": "independent",
     "releaseTagPattern": "{projectName}@{version}",
+    "git": {
+      "commit": true,
+      "commitMessage": "chore(release): publish [skip ci]",
+      "tag": true,
+      "push": false
+    },
     "version": {
+      "conventionalCommits": true,
+      "currentVersionResolver": "git-tag",
+      "fallbackCurrentVersionResolver": "disk",
       "versionActions": "./tools/typst-version-actions.js",
-      "currentVersionResolver": "disk",
       "versionPrefix": ""
     },
     "changelog": {

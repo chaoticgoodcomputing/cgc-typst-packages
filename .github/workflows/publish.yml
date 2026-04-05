@@ -1,67 +1,78 @@
 name: Publish to Typst Universe
 
-# Triggered automatically by release tags (e.g. cgc-resume-starter@2.1.0).
-# Can also be run manually; defaults to dry_run=true so the fork branch
-# is prepared and validated without opening the upstream PR.
+# Runs weekly (Monday 09:00 UTC) and on manual dispatch.
+# Discovers release tags from the past N days not yet published to typst/packages
+# and submits each via the typst-packages-shim fork.
+#
+# dry_run (manual default: false for schedule, true for dispatch):
+#   Prepares shim branches but skips opening upstream PRs.
 
 on:
-  push:
-    tags:
-      - "*@*"
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly, Monday 09:00 UTC
   workflow_dispatch:
     inputs:
-      package_name:
-        description: "Package name (e.g. cgc-resume-starter)"
-        required: true
-        type: string
-      version:
-        description: "Version (e.g. 2.0.0)"
-        required: true
-        type: string
+      since_days:
+        description: 'Look back N days for release tags'
+        type: number
+        default: 8
       dry_run:
-        description: "Prepare fork branch but skip PR creation"
+        description: 'Prepare shim branches but skip opening upstream PRs'
         type: boolean
         default: true
 
 jobs:
-  publish:
-    name: >-
-      Publish ${{
-        github.event_name == 'workflow_dispatch'
-        && format('{0}@{1}', inputs.package_name, inputs.version)
-        || github.ref_name
-      }}
+  # ── Discover which release tags from the past N days are not yet upstream ──
+  discover:
+    name: Discover unpublished releases
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      matrix: ${{ steps.scan.outputs.matrix }}
+      count:  ${{ steps.scan.outputs.count }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # ── 1. Resolve parameters from tag or manual inputs ──────────────────
-      - name: Determine release parameters
-        id: params
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            PACKAGE_NAME="${{ inputs.package_name }}"
-            VERSION="${{ inputs.version }}"
-            DRY_RUN="${{ inputs.dry_run }}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-            PACKAGE_NAME="${TAG%@*}"
-            VERSION="${TAG#*@}"
-            DRY_RUN="false"
-          fi
-          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
-          echo "dry_run=$DRY_RUN"           >> "$GITHUB_OUTPUT"
-          echo "Release: $PACKAGE_NAME@$VERSION  (dry_run=$DRY_RUN)"
+      - name: Fetch tags
+        run: git fetch --tags --prune
 
-      # ── 2. Validate package structure and version consistency ─────────────
+      - name: Scan for unpublished release tags
+        id: scan
+        env:
+          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
+          SINCE_DAYS: ${{ inputs.since_days || 8 }}
+        run: python3 .github/scripts/discover_releases.py --since-days "$SINCE_DAYS"
+
+  # ── Publish each discovered release to the shim fork and upstream ─────────
+  publish:
+    name: Publish ${{ matrix.package_name }}@${{ matrix.version }}
+    needs: discover
+    if: needs.discover.outputs.count != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.discover.outputs.matrix) }}
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --tags --prune
+
+      # ── 1. Validate package structure and version consistency ─────────────
       - name: Validate package
         run: |
-          PACKAGE_DIR="packages/${{ steps.params.outputs.package_name }}"
-          VERSION="${{ steps.params.outputs.version }}"
+          PACKAGE_DIR="packages/${{ matrix.package_name }}"
+          VERSION="${{ matrix.version }}"
 
           if [[ ! -d "$PACKAGE_DIR" ]]; then
             echo "::error::Package directory not found: $PACKAGE_DIR"
@@ -74,11 +85,10 @@ jobs:
           fi
 
           TOML_VERSION=$(python3 -c "
-          import tomllib, sys
-          with open('$PACKAGE_DIR/typst.toml', 'rb') as f:
-              print(tomllib.load(f)['package']['version'])
-          ")
-
+import tomllib
+with open('$PACKAGE_DIR/typst.toml', 'rb') as f:
+    print(tomllib.load(f)['package']['version'])
+")
           if [[ "$TOML_VERSION" != "$VERSION" ]]; then
             echo "::error::Version mismatch: tag says $VERSION but typst.toml says $TOML_VERSION"
             exit 1
@@ -94,27 +104,9 @@ jobs:
             exit 1
           fi
 
-          echo "Validation passed: ${{ steps.params.outputs.package_name }}@$VERSION"
+          echo "Validation passed: ${{ matrix.package_name }}@$VERSION"
 
-      # ── 3. Guard against re-releasing an already-published version ────────
-      - name: Check for existing upstream version
-        env:
-          GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
-        run: |
-          PACKAGE_NAME="${{ steps.params.outputs.package_name }}"
-          VERSION="${{ steps.params.outputs.version }}"
-          UPSTREAM_PATH="packages/preview/$PACKAGE_NAME/$VERSION"
-
-          STATUS=$(gh api "repos/typst/packages/contents/$UPSTREAM_PATH" \
-            --jq '.type' 2>/dev/null || echo "not_found")
-
-          if [[ "$STATUS" != "not_found" ]]; then
-            echo "::error::$UPSTREAM_PATH already exists in typst/packages. Cannot re-release."
-            exit 1
-          fi
-          echo "No existing upstream entry for $PACKAGE_NAME@$VERSION ✓"
-
-      # ── 4. Lint the package via typst-package-check ───────────────────────
+      # ── 2. Lint via typst-package-check ───────────────────────────────────
       - name: Cache Cargo bin
         uses: actions/cache@v4
         with:
@@ -128,10 +120,10 @@ jobs:
           fi
 
       - name: Lint
-        run: typst-package-check packages/${{ steps.params.outputs.package_name }}
+        run: typst-package-check packages/${{ matrix.package_name }}
 
-      # ── 5. Sync fork to upstream HEAD ─────────────────────────────────────
-      - name: Sync fork to upstream
+      # ── 3. Sync shim fork to upstream HEAD ────────────────────────────────
+      - name: Sync shim fork to upstream
         env:
           GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
         run: |
@@ -147,8 +139,8 @@ jobs:
             echo "::warning::Fork reset to $UPSTREAM_SHA"
           fi
 
-      # ── 6. Create branch on fork ──────────────────────────────────────────
-      - name: Get fork HEAD SHA
+      # ── 4. Create branch on shim fork ─────────────────────────────────────
+      - name: Get shim fork HEAD SHA
         id: fork_head
         env:
           GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
@@ -157,14 +149,12 @@ jobs:
             --jq '.object.sha')
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Create branch on fork
+      - name: Create branch on shim fork
         id: branch
         env:
           GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
         run: |
-          PACKAGE_NAME="${{ steps.params.outputs.package_name }}"
-          VERSION="${{ steps.params.outputs.version }}"
-          BRANCH="add/$PACKAGE_NAME-$VERSION"
+          BRANCH="add/${{ matrix.package_name }}-${{ matrix.version }}"
 
           EXISTING=$(gh api "repos/chaoticgoodcomputing/typst-packages-shim/git/ref/heads/$BRANCH" \
             --jq '.ref' 2>/dev/null || echo "")
@@ -182,21 +172,21 @@ jobs:
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "Created branch: $BRANCH"
 
-      # ── 7. Assemble and push package tree to fork ─────────────────────────
-      - name: Assemble package tree on fork
+      # ── 5. Assemble and push package tree to shim fork ────────────────────
+      - name: Assemble package tree on shim fork
         env:
           GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
         run: |
           python3 .github/scripts/push_package_tree.py \
-            --package-name "${{ steps.params.outputs.package_name }}" \
-            --version      "${{ steps.params.outputs.version }}" \
+            --package-name "${{ matrix.package_name }}" \
+            --version      "${{ matrix.version }}" \
             --branch       "${{ steps.branch.outputs.branch }}" \
             --fork         "chaoticgoodcomputing/typst-packages-shim"
 
-      # ── 8. Open PR on typst/packages (skipped when dry_run=true) ─────────
+      # ── 6. Open PR on typst/packages (skipped for dry runs) ───────────────
       - name: Check for existing PR
         id: pr_check
-        if: steps.params.outputs.dry_run == 'false'
+        if: ${{ inputs.dry_run != true }}
         env:
           GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
         run: |
@@ -207,15 +197,15 @@ jobs:
           echo "existing_url=$EXISTING" >> "$GITHUB_OUTPUT"
 
       - name: Build PR payload
-        if: steps.params.outputs.dry_run == 'false' && steps.pr_check.outputs.existing_url == ''
+        if: ${{ inputs.dry_run != true && steps.pr_check.outputs.existing_url == '' }}
         env:
-          PACKAGE_NAME: ${{ steps.params.outputs.package_name }}
-          VERSION: ${{ steps.params.outputs.version }}
-          BRANCH: ${{ steps.branch.outputs.branch }}
+          PACKAGE_NAME: ${{ matrix.package_name }}
+          VERSION:      ${{ matrix.version }}
+          BRANCH:       ${{ steps.branch.outputs.branch }}
         run: python3 .github/scripts/build_pr_payload.py
 
       - name: Open PR on typst/packages
-        if: steps.params.outputs.dry_run == 'false' && steps.pr_check.outputs.existing_url == ''
+        if: ${{ inputs.dry_run != true && steps.pr_check.outputs.existing_url == '' }}
         env:
           GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
         run: |
@@ -226,15 +216,13 @@ jobs:
           echo "$PR_URL"      >> "$GITHUB_STEP_SUMMARY"
 
       - name: PR already open (skipping)
-        if: steps.params.outputs.dry_run == 'false' && steps.pr_check.outputs.existing_url != ''
+        if: ${{ inputs.dry_run != true && steps.pr_check.outputs.existing_url != '' }}
         run: echo "::notice::PR already exists — ${{ steps.pr_check.outputs.existing_url }}"
 
-      - name: Dry run summary
-        if: steps.params.outputs.dry_run == 'true'
+      - name: Dry run complete
+        if: ${{ inputs.dry_run == true }}
         run: |
-          echo "## Dry Run Complete"                                             >> "$GITHUB_STEP_SUMMARY"
-          echo ""                                                                >> "$GITHUB_STEP_SUMMARY"
-          echo "Branch \`${{ steps.branch.outputs.branch }}\` has been pushed"  >> "$GITHUB_STEP_SUMMARY"
-          echo "to \`chaoticgoodcomputing/typst-packages-shim\`"               >> "$GITHUB_STEP_SUMMARY"
-          echo ""                                                                >> "$GITHUB_STEP_SUMMARY"
-          echo "Review the branch, then re-run with **dry run** unchecked."     >> "$GITHUB_STEP_SUMMARY"
+          echo "## Dry Run Complete"                                                >> "$GITHUB_STEP_SUMMARY"
+          echo ""                                                                   >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch \`${{ steps.branch.outputs.branch }}\` pushed to shim."   >> "$GITHUB_STEP_SUMMARY"
+          echo "Re-run with **dry run** unchecked to open the upstream PR."        >> "$GITHUB_STEP_SUMMARY"

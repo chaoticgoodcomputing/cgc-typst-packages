@@ -12,8 +12,14 @@
       "options": {
         "commands": [ "typst-package-check packages/cgc-resume-starter" ],
         "parallel": false
-      }
-    }
+      } },
+    "test": {
+      "//": "Placeholder — replace with tytanic or other test runner when test suite is added",
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [ "echo 'No tests configured yet for cgc-resume-starter'" ],
+        "parallel": false
+      } }
   },
   "tags": [ ]
 }

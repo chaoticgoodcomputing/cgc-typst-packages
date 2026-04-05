@@ -42,6 +42,13 @@ class TypstVersionActions extends VersionActions {
   }
 
   /**
+   * Typst packages have no intra-monorepo dependency declarations to update.
+   */
+  async updateProjectDependencies(_tree, _projectGraph, _dependenciesToUpdate) {
+    return [];
+  }
+
+  /**
    * Write the new version back into typst.toml.
    * Returns the list of files modified (for NX to stage and commit).
    */

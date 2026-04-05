@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Cargo bin
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-typst-package-check
+
+      - name: Install typst-package-check
+        run: |
+          if ! command -v typst-package-check &>/dev/null; then
+            cargo install typst-package-check --locked
+          fi
+
+      - name: Lint
+        run: pnpm nx run-many --target=lint --projects='packages/*'
+
+      - name: Test
+        run: pnpm nx run-many --target=test --projects='packages/*'

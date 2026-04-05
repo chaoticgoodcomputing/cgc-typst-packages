@@ -1,0 +1,68 @@
+name: Release
+
+# Fires after CI passes on main. nx release independently determines which
+# packages have releasable conventional commits and bumps their typst.toml
+# versions. The release commit contains [skip ci] to suppress further CI runs.
+# Pushes with GITHUB_TOKEN, which GitHub guarantees will not retrigger workflows.
+#
+# Loop prevention (two independent layers):
+#   1. GITHUB_TOKEN pushes never trigger new workflow runs.
+#   2. "[skip ci]" in the nx release commit message suppresses push-triggered CI.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  release:
+    name: Release
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Checkout current HEAD of main, not the SHA that triggered CI.
+          # persist-credentials keeps GITHUB_TOKEN wired to git remote for push.
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --tags --prune
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure git identity
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      # nx release --yes skips all interactive prompts.
+      # --skip-publish skips any npm/registry publish step (not applicable here).
+      # git.commit, git.tag configured in nx.json; git.push is false so we push
+      # explicitly below with the right flags.
+      - name: Run nx release
+        run: pnpm nx release --yes --skip-publish
+
+      - name: Push release commits and tags
+        run: |
+          if git log --oneline origin/main..HEAD | grep -q .; then
+            git push --follow-tags origin main
+            echo "::notice::Release committed and pushed to main."
+          else
+            echo "No releasable changes found — nothing to push."
+          fi
