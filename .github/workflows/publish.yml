@@ -40,12 +40,16 @@ jobs:
       - name: Fetch tags
         run: git fetch --tags --prune
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
       - name: Scan for unpublished release tags
         id: scan
         env:
           GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
           SINCE_DAYS: ${{ inputs.since_days || 8 }}
-        run: python3 .github/scripts/discover_releases.py --since-days "$SINCE_DAYS"
+        run: node .github/scripts/discover-releases.js --since-days "$SINCE_DAYS"
 
   # ── Publish each discovered release to the shim fork and upstream ─────────
   publish:
@@ -68,6 +72,10 @@ jobs:
       - name: Fetch tags
         run: git fetch --tags --prune
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
       # ── 1. Validate package structure and version consistency ─────────────
       - name: Validate package
         run: |
@@ -84,10 +92,11 @@ jobs:
             exit 1
           fi
 
-          TOML_VERSION=$(python3 -c "
-import tomllib
-with open('$PACKAGE_DIR/typst.toml', 'rb') as f:
-    print(tomllib.load(f)['package']['version'])
+          TOML_VERSION=$(node -e "
+const t = require('fs').readFileSync('$PACKAGE_DIR/typst.toml', 'utf8');
+const m = t.match(/^version\s*=\s*\"([^\"]+)\"/m);
+if (!m) process.exit(1);
+process.stdout.write(m[1]);
 ")
           if [[ "$TOML_VERSION" != "$VERSION" ]]; then
             echo "::error::Version mismatch: tag says $VERSION but typst.toml says $TOML_VERSION"
@@ -177,7 +186,7 @@ with open('$PACKAGE_DIR/typst.toml', 'rb') as f:
         env:
           GH_TOKEN: ${{ secrets.TYPST_PACKAGES_PAT }}
         run: |
-          python3 .github/scripts/push_package_tree.py \
+          node .github/scripts/push-package-tree.js \
             --package-name "${{ matrix.package_name }}" \
             --version      "${{ matrix.version }}" \
             --branch       "${{ steps.branch.outputs.branch }}" \
@@ -202,7 +211,7 @@ with open('$PACKAGE_DIR/typst.toml', 'rb') as f:
           PACKAGE_NAME: ${{ matrix.package_name }}
           VERSION:      ${{ matrix.version }}
           BRANCH:       ${{ steps.branch.outputs.branch }}
-        run: python3 .github/scripts/build_pr_payload.py
+        run: node .github/scripts/build-pr-payload.js
 
       - name: Open PR on typst/packages
         if: ${{ inputs.dry_run != true && steps.pr_check.outputs.existing_url == '' }}
